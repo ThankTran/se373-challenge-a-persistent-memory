@@ -9,7 +9,8 @@ import streamlit as st
 from langchain_core.messages import AIMessage, HumanMessage
 
 import paths
-from agent import TOOLS, build_agent, build_model, capabilities, system_prompt
+from memory_store import MemoryReadError, load_memory
+from agent import build_agent, build_model, capabilities, system_prompt, tools_for_session
 from config import APP_TITLE, CAPABILITY_TEXT, PROJECT_NAME, RECURSION_LIMIT, load_settings
 from observer import (
     STATUS_DONE,
@@ -24,9 +25,8 @@ from observer import (
 from reset_workspace import WorkspaceError, ensure_workspace
 from trace import TraceWriter, log_exception
 
-PANEL_HEIGHT = 600  # chiều cao dự phòng (px); CSS bên dưới kéo hai cột theo chiều cao cửa sổ
-# Streamlit không có tùy chọn chiều cao theo viewport, nên dùng một khối CSS nhỏ:
-# khóa cuộn của trang, hai cột (key chat_panel / state_panel) cao bằng phần còn lại của cửa sổ.
+PANEL_HEIGHT = 600
+
 PAGE_CSS = """
 <style>
 [data-testid="stAppScrollToBottomContainer"] { overflow: hidden; }
@@ -315,7 +315,7 @@ def render_context(observer: Observer, interactive: bool) -> None:
     snapshots = observer.snapshots
     if not snapshots:
         st.info("Chưa có request nào được gửi. Dưới đây là Context cấu hình, chưa phải request đã gửi.", icon=":material/info:")
-        tools = [tool_schema(t) for t in TOOLS]
+        tools = [tool_schema(t) for t in tools_for_session(st.session_state.conversation_id)]
         with st.expander("Context cấu hình: system prompt", icon=":material/article:"):
             st.code(system_prompt(), language="markdown", wrap_lines=True)
         with st.expander(f"Context cấu hình: tools schema ({len(tools)})", icon=":material/data_object:"):
@@ -398,7 +398,7 @@ def render_state_panel(interactive: bool) -> None:
     st.subheader("State & Context")
     render_counters(observer)
     render_context(observer, interactive)
-    render_capabilities(observer, capabilities(), [tool_schema(t) for t in TOOLS])
+    render_capabilities(observer, capabilities(), [tool_schema(t) for t in tools_for_session(st.session_state.conversation_id)])
     render_messages(observer, interactive)
     render_event_log(observer)
 
@@ -448,7 +448,7 @@ def run_turn(text: str, settings, state_box) -> None:
 
     refresh()
     try:
-        agent = build_agent(build_model(settings))
+        agent = build_agent(build_model(settings), ss.conversation_id)
         stream = agent.stream(
             {"messages": working},
             config={"recursion_limit": RECURSION_LIMIT},
@@ -521,6 +521,11 @@ def main() -> None:
     st.set_page_config(page_title=APP_TITLE, page_icon=":material/smart_toy:", layout="wide")
     st.html(PAGE_CSS)
     init_state()
+    try:
+        load_memory()
+    except MemoryReadError as exc:
+        st.error(str(exc))
+        st.stop()
     try:
         ensure_workspace()
     except WorkspaceError as exc:

@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import sys
 from datetime import datetime, timezone
 from typing import Any
 
@@ -19,6 +18,10 @@ SCHEMA_VERSION = 1
 MEMORY_FILENAME = "project_memory.json"
 KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,63}$")
 MAX_VALUE_LENGTH = 500
+
+
+class MemoryReadError(ValueError):
+    """Không đọc được memory; giữ nguyên dữ liệu trên đĩa."""
 
 
 class InvalidKeyError(ValueError):
@@ -40,8 +43,8 @@ def _empty_document() -> dict[str, Any]:
 def _is_valid_document(doc: Any) -> bool:
     if not isinstance(doc, dict):
         return False
-    current = doc.get("current", {})
-    history = doc.get("history", [])
+    current = doc.get("current")
+    history = doc.get("history")
     if not isinstance(current, dict) or not isinstance(history, list):
         return False
     for record in current.values():
@@ -64,17 +67,18 @@ def _write_atomic(doc: dict[str, Any]) -> None:
 
 
 def load_memory() -> dict[str, Any]:
-    """Đọc memory từ đĩa. Không bao giờ ném lỗi."""
+    """Đọc memory; chỉ trả dữ liệu rỗng khi file chưa tồn tại."""
     target = _memory_file()
-    if not target.exists():
-        return _empty_document()
     try:
         doc = json.loads(target.read_text(encoding="utf-8"))
         if not _is_valid_document(doc):
             raise ValueError("sai cấu trúc document")
-    except (OSError, ValueError) as exc:  # JSONDecodeError là con của ValueError
-        print(f"[memory] Bỏ qua file memory hỏng ({target}): {exc}", file=sys.stderr)
+    except FileNotFoundError:
         return _empty_document()
+    except (OSError, ValueError) as exc:  # JSONDecodeError là con của ValueError
+        raise MemoryReadError(
+            f"Không đọc được memory ({target}). File được giữ nguyên; hãy sửa hoặc khôi phục bản sao lưu. Chi tiết: {exc}"
+        ) from exc
     doc.setdefault("version", SCHEMA_VERSION)
     doc.setdefault("updated_at", None)
     doc.setdefault("current", {})
