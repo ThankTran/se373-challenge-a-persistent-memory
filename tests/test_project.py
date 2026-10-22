@@ -55,12 +55,13 @@ def test_project_has_only_its_own_modules():
         "agent.py",
         "app.py",
         "config.py",
+        "memory_store.py",
         "observer.py",
         "paths.py",
         "prompts.py",
         "reset_workspace.py",
         "trace.py",
     ]
-    assert sorted(p.name for p in (ROOT / "tools").glob("*.py")) == ["__init__.py", "files.py"]
+    assert sorted(p.name for p in (ROOT / "tools").glob("*.py")) == ["__init__.py", "files.py", "memory.py"]    
     assert not (ROOT / "fixtures" / "skills").exists()
     assert not (ROOT / "workspace" / "skills").exists()

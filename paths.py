@@ -9,3 +9,6 @@ FIXTURES_DIR = PROJECT_ROOT / "fixtures"
 WORKSPACE_DIR = PROJECT_ROOT / "workspace"
 OUTPUT_SUBDIR = "output"
 WORKSPACE_MARKER = ".lab-workspace"
+
+MEMORY_DIR = PROJECT_ROOT / "memory"
+MEMORY_FILE = MEMORY_DIR / "project_memory.json"
