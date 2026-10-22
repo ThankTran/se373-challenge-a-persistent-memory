@@ -160,11 +160,19 @@ def test_two_sessions_record_their_own_session_id(memory_dir):
     assert [h["source_session"] for h in history] == ["sess-A", "sess-B"]
 
 
-def test_corrupted_memory_file_does_not_break_load(memory_dir, capsys):
+@pytest.mark.parametrize("content", [
+    b"{invalid json", b"{}", b'{"current": [], "history": []}',
+    b'{"current": {"auth": "JWT"}, "history": []}', b"\xff\xfe",
+])
+def test_corrupted_memory_is_preserved(memory_dir, content):
     memory_dir.mkdir(parents=True)
-    _file(memory_dir).write_text("{rác không phải json", encoding="utf-8")
-    doc = load_memory()
-    assert doc["current"] == {} and doc["history"] == []
-    assert "memory" in capsys.readouterr().err
-    update_memory("auth", "JWT", "s1")
-    assert json.loads(_file(memory_dir).read_text(encoding="utf-8"))["current"]["auth"]["value"] == "JWT"
+    target = _file(memory_dir)
+    target.write_bytes(content)
+    with pytest.raises(memory_store.MemoryReadError):
+        load_memory()
+    with pytest.raises(memory_store.MemoryReadError):
+        update_memory("auth", "JWT", "s1")
+    result = json.loads(make_memory_tool("s1").invoke({"key": "auth", "value": "JWT"}))
+    assert result["ok"] is False
+    assert result["error"]["code"] == "MEMORY_READ_FAILED"
+    assert target.read_bytes() == content

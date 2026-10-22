@@ -45,11 +45,11 @@ def test_missing_config_blocks_model(lab_dirs, monkeypatch):
 def test_renders_title_and_state_inspector(configured_env):
     at = make_app().run()
     assert not at.exception
-    assert at.title[0].value == "Stage 01: File tools"
+    assert at.title[0].value == "Challenge A: Persistent Memory"
     assert "State & Context" in [h.value for h in at.subheader]
     labels = [e.label for e in at.expander]
     assert "Context cấu hình: system prompt" in labels
-    assert any(label.startswith("Tools được cấp (2)") for label in labels)
+    assert any(label.startswith("Tools được cấp (3)") for label in labels)
     assert "File đầu ra" in [h.value for h in at.subheader]
 
 
@@ -141,3 +141,48 @@ def test_output_file_preview_does_not_call_agent(configured_env, monkeypatch):
     assert len(model.received) == 2
     assert len(at.session_state["observer"].events) == events_before
     assert at.session_state["model_history"] == history_before
+
+
+def test_memory_persists_across_new_conversations(configured_env, monkeypatch):
+    import memory_store
+
+    model = ScriptedChatModel(responses=[
+        AIMessage(content="", tool_calls=[{"name": "update_project_memory", "args": {"key": "auth", "value": "JWT"}, "id": "m1"}]),
+        AIMessage(content="Đã lưu."),
+        AIMessage(content="Dùng quy ước đã lưu."),
+        AIMessage(content="", tool_calls=[{"name": "update_project_memory", "args": {"key": "auth", "value": "session cookie"}, "id": "m2"}]),
+        AIMessage(content="Đã đổi."),
+        AIMessage(content="Dùng quy ước mới."),
+    ])
+    monkeypatch.setattr(agent, "build_model", lambda settings: model)
+    at = make_app().run()
+    first_id = at.session_state["conversation_id"]
+    send(at, "Ghi nhớ cách xác thực.")
+    assert memory_store.load_memory()["current"]["auth"]["source_session"] == first_id
+    at.button[0].click().run()
+    assert at.session_state["model_history"] == []
+    second_id = at.session_state["conversation_id"]
+    send(at, "Đề xuất đăng nhập theo quy ước dự án.")
+    snapshot = at.session_state["observer"].snapshots[-1]
+    assert "- auth: JWT" in snapshot["system_prompt"]
+    assert [m.type for m in model.received[2]] == ["system", "human"]
+    send(at, "Đổi cách xác thực.")
+    assert memory_store.load_memory()["current"]["auth"]["source_session"] == second_id
+    at.button[0].click().run()
+    send(at, "Đề xuất đăng nhập theo quy ước dự án.")
+    snapshot = at.session_state["observer"].snapshots[-1]
+    assert "- auth: session cookie" in snapshot["system_prompt"]
+    assert "JWT" not in snapshot["system_prompt"]
+    assert [m.type for m in model.received[-1]] == ["system", "human"]
+
+
+def test_corrupt_memory_blocks_chat_without_overwrite(mock_model):
+    paths.MEMORY_DIR.mkdir(parents=True)
+    target = paths.MEMORY_DIR / "project_memory.json"
+    target.write_bytes(b"{broken")
+    at = make_app().run()
+    assert not at.exception
+    assert any("File được giữ nguyên" in e.value for e in at.error)
+    assert len(at.chat_input) == 0
+    assert mock_model.received == []
+    assert target.read_bytes() == b"{broken"

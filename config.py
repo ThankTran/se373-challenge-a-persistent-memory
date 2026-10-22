@@ -7,9 +7,9 @@ from dotenv import load_dotenv
 
 import paths
 
-PROJECT_NAME = "stage-01-files"
-APP_TITLE = "Stage 01: File tools"
-CAPABILITY_TEXT = "Tools: read_file (đọc file trong workspace), write_file (ghi vào workspace/output/). Không có skill, không chạy lệnh."
+PROJECT_NAME = "challenge-a-persistent-memory"
+APP_TITLE = "Challenge A: Persistent Memory"
+CAPABILITY_TEXT = "Tools: read_file (đọc file trong workspace), write_file (ghi vào workspace/output/). update_project_memory (lưu quy ước qua các hội thoại)."
 
 # Giới hạn số lần gọi model trong một lượt chat (ModelCallLimitMiddleware).
 MODEL_CALL_LIMIT = 8

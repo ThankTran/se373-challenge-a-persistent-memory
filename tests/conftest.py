@@ -37,6 +37,7 @@ class ScriptedChatModel(BaseChatModel):
 @pytest.fixture
 def lab_dirs(tmp_path, monkeypatch):
     """Workspace, trace và .env trỏ vào thư mục tạm để test không đụng dữ liệu thật của project."""
+    monkeypatch.setattr(paths, "MEMORY_DIR", tmp_path / "memory")
     monkeypatch.setattr(paths, "TRACES_DIR", tmp_path / "traces")
     monkeypatch.setattr(paths, "ENV_PATH", tmp_path / "missing.env")
     monkeypatch.setattr(paths, "WORKSPACE_DIR", tmp_path / "workspace")

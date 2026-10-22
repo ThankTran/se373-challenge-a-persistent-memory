@@ -33,6 +33,8 @@ def make_memory_tool(session_id: str) -> BaseTool:
         """
         try:
             result = memory_store.update_memory(key, value, session_id)
+        except memory_store.MemoryReadError as exc:
+            return _error("MEMORY_READ_FAILED", str(exc))
         except memory_store.InvalidKeyError as exc:
             return _error("MEMORY_KEY_INVALID", str(exc))
         except memory_store.InvalidValueError as exc:

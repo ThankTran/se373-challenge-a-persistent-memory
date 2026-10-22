@@ -37,7 +37,7 @@ def test_read_then_write_with_parallel_calls_and_missing_file(lab_dirs):
             AIMessage(content="Đã ghi output/summary.md"),
         ]
     )
-    events, new_messages = stream_events(build_agent(model), [HumanMessage(content="Đọc data/weekly_notes.md và ghi tóm tắt vào output/summary.md.")])
+    events, new_messages = stream_events(build_agent(model, "test-session"), [HumanMessage(content="Đọc data/weekly_notes.md và ghi tóm tắt vào output/summary.md.")])
 
     kinds = [e["event"] for e in events]
     assert kinds.count("model_request") == 3
@@ -50,7 +50,7 @@ def test_read_then_write_with_parallel_calls_and_missing_file(lab_dirs):
 
     requests = [e["data"] for e in events if e["event"] == "model_request"]
     assert requests[0]["system_prompt"] == system_prompt()
-    assert [t["name"] for t in requests[0]["tools"]] == ["read_file", "write_file"]
+    assert [t["name"] for t in requests[0]["tools"]] == ["read_file", "write_file", "update_project_memory"]
     assert requests[0]["tools"][1]["parameters"]["required"] == ["path", "content"]
     second_roles = [m["role"] for m in requests[1]["messages"]]
     assert second_roles == ["user", "assistant", "tool", "tool"]
